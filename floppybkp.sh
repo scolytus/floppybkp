@@ -43,20 +43,31 @@ SUDO=""
 
 chk_crt_dir $BASE_DIR
 
+NOW=$(date +%Y%m%d%H%M%S)
+DIR="${BASE_DIR}/${NOW}"
+chk_crt_dir $DIR
+
 COUNT=0
 REPLY='y'
 while [[ ${REPLY} =~ ^[Yy]?$ ]]; do
   COUNT=$(($COUNT + 1))
-  NOW=$(date +%Y%m%d%H%M%S)
-  DIR="${BASE_DIR}/${NOW}"
-  chk_crt_dir $DIR
 
-  BASE="${DIR}/${NOW}"
+  NUM=$(printf "%03d" "${COUNT}")
+  NAME="disk_${NUM}"
+  DISK_DIR="${DIR}/${NAME}"
+  MNT_DIR="${DISK_DIR}/mountpoint"
+  FILES_DIR="${DISK_DIR}/files"
+  BASE="${DISK_DIR}/${NAME}"
+
+  chk_crt_dir "${DISK_DIR}"
+  chk_crt_dir "${MNT_DIR}"
+  chk_crt_dir "${FILES_DIR}"
+
   IMG="${BASE}.img"
   LOG="${BASE}.ddrlog"
   OUT="${BASE}.outlog"
 
-  inf "disk ${COUNT} - id is ${NOW}"
+  inf "disk ${COUNT} - id is ${NAME}"
 
   read -p "           enter description: "
   echo "${REPLY}" > "${BASE}.description"
@@ -75,12 +86,14 @@ while [[ ${REPLY} =~ ^[Yy]?$ ]]; do
   inf "    calculating hash"
   sha1sum "${IMG}" > "${BASE}.sha1"
 
-  inf "    mounting image and retrieve file list"
-  MNT_DIR="${DIR}/mountpoint"
-  chk_crt_dir "${MNT_DIR}"
+  inf "    mounting image and retrieve files"
   $SUDO mount -t vfat -o loop -o defaults -o umask=000 -o ro "${IMG}" "${MNT_DIR}"
   ls -al "${MNT_DIR}" > "${BASE}.lsal"
   ls     "${MNT_DIR}" > "${BASE}.ls"
+  echo "################################################################################" &>> "${OUT}"
+  echo "rsync run" &>> "${OUT}"
+  echo "################################################################################" &>> "${OUT}"
+  rsync -av "${MNT_DIR}/" "${FILES_DIR}" &>> "${OUT}"
   $SUDO umount "${MNT_DIR}"
 
   read -p "Proceed with another disk? (Y or y for yes)" -n 1 -r
